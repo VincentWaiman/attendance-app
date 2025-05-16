@@ -1,0 +1,157 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+<!-- DataTables Default CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<div class="p-4">
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Majors List</h5>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMajorModal">
+        Add Major
+      </button>
+    </div>
+    <div class="card-body">
+      <table class="display table table-bordered" id="majorsTable" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th>No</th>
+            <th>Name</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for major in majors %}
+          <tr data-id="{{ major.id }}">
+            <td></td>
+            <td class="name">{{ major.name }}</td>
+            <td>
+              <button class="btn btn-sm btn-warning edit-btn">Edit</button>
+              <button class="btn btn-sm btn-success save-btn d-none">Save</button>
+              <button class="btn btn-sm btn-secondary cancel-btn d-none">Cancel</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Major Modal -->
+<div class="modal fade" id="addMajorModal" tabindex="-1" aria-labelledby="addMajorModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addMajorForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addMajorModalLabel">Add New Major</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="majorName" class="form-label">Major Name</label>
+            <input type="text" class="form-control" id="majorName" name="name" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- JS Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+$(document).ready(function () {
+  const table = $('#majorsTable').DataTable({
+    columnDefs: [{
+      targets: 0,
+      searchable: false,
+      orderable: false,
+      render: function (data, type, row, meta) {
+        return meta.row + 1;
+      }
+    }],
+    order: [[1, 'asc']]
+  });
+
+  $('#majorsTable').on('click', '.edit-btn', function () {
+    const row = $(this).closest('tr');
+    const nameCell = row.find('.name');
+    const currentValue = nameCell.text().trim();
+    nameCell.html(`<input type="text" class="form-control" value="${currentValue}">`);
+    row.find('.edit-btn').addClass('d-none');
+    row.find('.save-btn, .cancel-btn').removeClass('d-none');
+  });
+
+  $('#majorsTable').on('click', '.cancel-btn', function () {
+    const row = $(this).closest('tr');
+    const input = row.find('input');
+    const original = input.prop('defaultValue');
+    row.find('.name').text(original);
+    row.find('.edit-btn').removeClass('d-none');
+    row.find('.save-btn, .cancel-btn').addClass('d-none');
+  });
+
+  $('#majorsTable').on('click', '.save-btn', async function () {
+    const row = $(this).closest('tr');
+    const id = row.data('id');
+    const input = row.find('input');
+    const newName = input.val();
+
+    const response = await fetch(`/admin/majors/edit/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName })
+    });
+
+    if (response.ok) {
+      row.find('.name').text(newName);
+      row.find('.edit-btn').removeClass('d-none');
+      row.find('.save-btn, .cancel-btn').addClass('d-none');
+    } else {
+      alert('Failed to save changes.');
+    }
+  });
+
+  $('#addMajorForm').on('submit', async function (e) {
+    e.preventDefault();
+
+    const name = $('#majorName').val().trim();
+    if (!name) return alert("Please enter a name");
+
+    const response = await fetch('/admin/majors/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+
+      const newRow = table.row.add([
+        '',
+        data.name,
+        `
+        <button class="btn btn-sm btn-warning edit-btn">Edit</button>
+        <button class="btn btn-sm btn-success save-btn d-none">Save</button>
+        <button class="btn btn-sm btn-secondary cancel-btn d-none">Cancel</button>
+        `
+      ]).draw(false).node();
+
+      $(newRow).attr('data-id', data.id).find('td').eq(1).addClass('name');
+
+      $('#addMajorModal').modal('hide');
+      this.reset();
+    } else {
+      alert('Failed to add major. It may already exist.');
+    }
+  });
+});
+</script>
+{% endblock %}

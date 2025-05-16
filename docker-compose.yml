@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  db:
+    image: mysql:latest
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - datadb:/var/lib/mysql
+
+  pma:
+    image: phpmyadmin
+    container_name: pma
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - '5050:80'
+    depends_on:
+      - db
+
+  # flask_app:
+  #   build: ./web
+  #   container_name: web
+  #   command: /bin/bash -c "sleep 10 && flask run --host=0.0.0.0 --reload"
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     - db
+  #   volumes:
+  #     - ./web:/app
+
+volumes:
+  datadb:

@@ -1,0 +1,287 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<!-- jQuery + DataTables JS -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<div class="p-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <!-- Add Student Button -->
+  <div class="d-flex justify-content-end mb-3 gap-2">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+      Add Student
+    </button>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importCSVModal">
+      Import ZIP
+    </button>
+  </div>
+
+  <div class="mb-3 d-flex gap-2">
+    <button class="btn btn-warning" id="editStudentBtn">Edit</button>
+    <button class="btn btn-secondary d-none" id="cancelEditBtn">Cancel</button>
+    <button class="btn btn-danger" id="deleteSelectedBtn" disabled>Delete Selected</button>
+  </div>
+  
+  <!-- Card Wrapper -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Student List</h5>
+    </div>
+    <div class="card-body">
+      <table id="studentTable" class="display table table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th class="select-col"></th>
+            <th>NIM</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Batch Year</th>
+            <th>Major</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Import Students ZIP Modal -->
+<div class="modal fade" id="importCSVModal" tabindex="-1" aria-labelledby="importCSVModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('admin.import_students_csv') }}" enctype="multipart/form-data">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="importCSVModalLabel">Import Students (ZIP)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="csv_file" class="form-label">Upload ZIP File</label>
+            <input type="file" name="csv_file" accept=".zip" class="form-control" required>
+            <small class="form-text text-muted">
+              Upload ZIP berisi <code>students.csv</code> dan folder foto sesuai <code>nim</code><br>
+              Contoh struktur ZIP:
+              <pre>
+                students.csv
+                212100113/
+                  main.jpg
+                  extra1.jpg
+                212101349/
+                  main.jpg
+              </pre>
+            </small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Import</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+<!-- Add Student Modal -->
+<div class="modal fade" id="addStudentModal" tabindex="-1" aria-labelledby="addStudentModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('admin.add_student') }}" enctype="multipart/form-data">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addStudentModalLabel">Add New Student</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="nim" class="form-label">NIM</label>
+            <input type="text" class="form-control" name="nim" id="nim" required pattern="\d{9,}" title="Minimal 9 angka">
+          </div>
+          <div class="mb-3">
+            <label for="name" class="form-label">Name</label>
+            <input type="text" class="form-control" name="name" id="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" id="email" required>
+          </div>
+          <div class="mb-3">
+            <label for="batch_year" class="form-label">Batch Year</label>
+            <input type="number" class="form-control" name="batch_year" id="batch_year" required>
+          </div>
+          <div class="mb-3">
+            <label for="major_id" class="form-label">Major</label>
+            <select class="form-select" name="major_id" id="major_id" required>
+              {% for major in majors %}
+                <option value="{{ major.id }}">{{ major.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="photos" class="form-label">Upload Face Images</label>
+            <input type="file" name="photos" id="photos" multiple>
+            <small class="form-text text-muted">You can upload multiple images. One must be named <code>main.jpg</code></small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Add Student</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .select-col {
+    display: none;
+  }
+</style>
+
+<script>
+  $(document).ready(function () {
+    const table = $('#studentTable').DataTable({
+      ajax: "{{ url_for('admin.get_students') }}",
+      columnDefs: [
+        {
+          targets: 0,
+          visible: false, // Initially hidden
+          orderable: false,
+          searchable: false,
+          className: 'select-checkbox text-center',
+          render: function (data, type, row) {
+            return `<input type="checkbox" class="row-select" value="${row.nim}">`;
+          }
+        }
+      ],
+      columns: [
+        { data: null },
+        { data: 'nim' },
+        { data: 'name' },
+        { data: 'email' },
+        { data: 'batch_year' },
+        { data: 'major_name' }
+      ]
+    });
+
+    function toggleActionButtons() {
+      const selectedCount = $('.row-select:checked').length;
+      $('#deleteSelectedBtn').prop('disabled', selectedCount === 0);
+    }
+
+    $('#studentTable tbody').on('change', '.row-select', function () {
+      toggleActionButtons();
+    });
+
+    $('#editStudentBtn').on('click', function () {
+      const column = table.column(0);
+      column.visible(true);              // Show checkbox column
+      $('.select-col').show();           // Show column header
+      table.$('.row-select').prop('checked', false); // Clear any previous selections
+
+      $('#editStudentBtn').addClass('d-none');
+      $('#cancelEditBtn').removeClass('d-none');
+
+      toggleActionButtons();
+    });
+
+    $('#cancelEditBtn').on('click', function () {
+      const column = table.column(0);
+      column.visible(false);             // Hide checkbox column
+      $('.select-col').hide();           // Hide column header
+      table.$('.row-select').prop('checked', false); // Clear selections
+
+      $('#cancelEditBtn').addClass('d-none');
+      $('#editStudentBtn').removeClass('d-none');
+
+      toggleActionButtons();
+    });
+
+    $('#deleteSelectedBtn').on('click', function () {
+        const selectedNIMs = $('.row-select:checked').map(function () {
+          return this.value;
+        }).get();
+
+        if (selectedNIMs.length === 0) return;
+
+        if (confirm(`Delete ${selectedNIMs.length} selected student(s)?`)) {
+          $.ajax({
+            url: "{{ url_for('admin.delete_students_bulk') }}",
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ nims: selectedNIMs }),
+            success: function (res) {
+              if (res.success) {
+                table.ajax.reload();
+                $('#deleteSelectedBtn').prop('disabled', true);
+                alert('Students deleted successfully.');
+              } else {
+                alert('Failed to delete students.');
+              }
+            },
+            error: function () {
+              alert('Error during deletion.');
+            }
+          });
+        }
+      });
+
+    // Optional: Validate NIM & Email when user inputs
+    function validateStudentInput() {
+      const nim = $('#nim').val().trim();
+      const email = $('#email').val().trim();
+
+      if (!/^\d{9,}$/.test(nim)) {
+        $('#nim').addClass('is-invalid');
+        $('#nim').next('.invalid-feedback').remove();
+        $('#nim').after('<div class="invalid-feedback">NIM harus minimal 9 angka</div>');
+        return;
+      }
+
+      $.ajax({
+        url: "{{ url_for('admin.check_student') }}",
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ nim: nim, email: email }),
+        success: function (res) {
+          $('#nim, #email').removeClass('is-invalid is-valid');
+
+          if (res.exists_nim) {
+            $('#nim').addClass('is-invalid');
+            $('#nim').next('.invalid-feedback').remove();
+            $('#nim').after('<div class="invalid-feedback">NIM sudah terdaftar!</div>');
+          } else {
+            $('#nim').addClass('is-valid');
+          }
+
+          if (res.exists_email) {
+            $('#email').addClass('is-invalid');
+            $('#email').next('.invalid-feedback').remove();
+            $('#email').after('<div class="invalid-feedback">Email sudah terdaftar!</div>');
+          } else {
+            $('#email').addClass('is-valid');
+          }
+        }
+      });
+    }
+
+    $('#nim, #email').on('blur', validateStudentInput);
+  });
+</script>
+
+  
+  
+
+{% endblock %}

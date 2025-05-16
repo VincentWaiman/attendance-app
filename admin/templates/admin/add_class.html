@@ -1,0 +1,392 @@
+<!-- templates/admin/add_class.html -->
+{% extends 'admin/base.html' %}
+
+{% block content %}
+
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<!-- Dual Listbox CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap4-duallistbox/dist/bootstrap-duallistbox.min.css" rel="stylesheet" />
+
+<style>
+    .bootstrap-duallistbox-container select {
+    min-height: 250px;
+    font-size: 14px;
+    }
+
+    .bootstrap-duallistbox-container .moveall,
+    .bootstrap-duallistbox-container .removeall,
+    .bootstrap-duallistbox-container .move,
+    .bootstrap-duallistbox-container .remove {
+    background-color: #0d6efd;
+    border: none;
+    color: white;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    }
+
+    .bootstrap-duallistbox-container .moveall:hover,
+    .bootstrap-duallistbox-container .removeall:hover,
+    .bootstrap-duallistbox-container .move:hover,
+    .bootstrap-duallistbox-container .remove:hover {
+    background-color: #0b5ed7;
+    }
+
+    .bootstrap-duallistbox-container .btn-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    }
+</style>
+
+<style>
+    .dual-listbox {
+    width: 100%;
+    }
+
+    .dual-listbox__container {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+    }
+
+    .dual-listbox__title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    }
+
+    .dual-listbox__search {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    margin-bottom: 0.5rem;
+    border-radius: 5px;
+    }
+
+    .dual-listbox select {
+    width: 100%; /* ✅ match search box width */
+    height: 300px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 0.25rem;
+    font-size: 14px;
+    }
+
+    .dual-listbox__buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .dual-listbox__buttons button {
+        padding: 0.5rem;
+        background-color: #f4f6fa;
+        border: 1px solid #dcdfe4;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 14px;
+        width: 100px;
+    }
+
+    .dual-listbox__container {
+        display: flex;
+        align-items: flex-start;
+        gap: 2rem;
+    }
+
+    /* Add these */
+    .dual-listbox__column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dual-listbox__buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;    
+        width: 120px;
+    }
+
+    .dual-listbox__search,
+    .dual-listbox select {
+        width: 100%; /* make sure both match */
+        box-sizing: border-box;
+    }
+
+    </style>
+
+    <style>
+        .select2-container {
+        z-index: 9999;
+        }
+    </style>
+    
+  
+
+    <div class="m-4">
+        <a href="{{ url_for('admin.classes') }}" class="btn btn-secondary mb-3">← Back to Class List</a>
+      
+        <div class="card shadow-sm">
+          <div class="card-header">
+            <h4 class="mb-0">Add New Class</h4>
+          </div>
+          <div class="card-body">
+            <form action="{{ url_for('admin.save_class') }}" method="POST">
+              <div class="mb-3">
+                <label for="class_code" class="form-label">Class Code</label>
+                <input type="text" class="form-control" name="class_code" id="class_code" required>
+                <small id="class_code_error" class="text-danger"></small> 
+              </div>
+      
+              <div class="mb-3">
+                <label for="class_name" class="form-label">Class Name</label>
+                <input type="text" class="form-control" name="class_name" id="class_name" required>
+                <small id="class_name_error" class="text-danger"></small> 
+              </div>
+      
+              <div class="mb-3">
+                <label for="location" class="form-label">Location</label>
+                <input type="text" class="form-control" name="location">
+              </div>
+      
+              <div class="mb-3">
+                <label for="major_id" class="form-label">Major</label>
+                <select class="form-select" id="major_id" name="major_id" required>
+                  {% for major in majors %}
+                    <option value="{{ major.id }}">{{ major.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+      
+              <div class="mb-3">
+                <label for="teacher_id" class="form-label">Assign Teacher</label>
+                <select class="form-select" id="teacher_id" name="teacher_id" required>
+                  {% for user in teachers %}
+                    <option value="{{ user.id }}">{{ user.name }} ({{ user.email }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+      
+              <div class="mb-3">
+                <label for="day" class="form-label">Day</label>
+                <select class="form-select" name="day" required>
+                  <option value="">Select a day</option>
+                  <option>Monday</option>
+                  <option>Tuesday</option>
+                  <option>Wednesday</option>
+                  <option>Thursday</option>
+                  <option>Friday</option>
+                  <option>Saturday</option>
+                  <option>Sunday</option>
+                </select>
+              </div>
+      
+              <div class="row">
+                <div class="mb-3 col-md-6">
+                  <label for="class_time_start" class="form-label">Start Time</label>
+                  <input type="time" class="form-control" name="class_time_start" required>
+                </div>
+                <div class="mb-3 col-md-6">
+                  <label for="class_time_end" class="form-label">End Time</label>
+                  <input type="time" class="form-control" name="class_time_end" required>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="minimum_attendance_minutes" class="form-label">Minimum Attendance (in Minutes)</label>
+                <input type="number" class="form-control" name="minimum_attendance_minutes" id="minimum_attendance_minutes" min="0" value="0" required>
+              </div>
+      
+              <!-- Hidden Select Element for DualListbox -->
+            <div class="mb-3">
+                <label for="kt_dual_listbox_students" class="form-label">Assign Students</label>
+                <select id="kt_dual_listbox_students" name="student_ids" multiple style="display: none;">
+                {% for student in students %}
+                    <option value="{{ student.nim }}">{{ student.name }} ({{ student.email }})</option>
+                {% endfor %}
+                </select>
+            </div>
+
+
+              <div class="text-end">
+                <button type="submit" class="btn btn-success">Create Class</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+<!-- jQuery (required for both plugins) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<!-- Dual Listbox JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap4-duallistbox/dist/jquery.bootstrap-duallistbox.min.js"></script>
+
+<!-- ... your other scripts like jQuery and Select2 ... -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- 👇 Paste the DualListbox CLASS HERE -->
+<script>
+    class DualListbox {
+      constructor(selectElement, options = {}) {
+        this.selectElement = selectElement;
+        this.options = options;
+        this.init();
+      }
+    
+      init() {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('dual-listbox');
+    
+        const container = document.createElement('div');
+        container.classList.add('dual-listbox__container');
+    
+        // Available box
+        const available = this.createList('Available options', 'available');
+        // Selected box
+        const selected = this.createList('Selected options', 'selected');
+    
+        // Transfer buttons
+        const buttons = document.createElement('div');
+        buttons.classList.add('dual-listbox__buttons');
+        buttons.innerHTML = `
+          <button type="button" class="btn-add-all">${this.options.addAllButtonText || 'Add All'}</button>
+          <button type="button" class="btn-add">${this.options.addButtonText || 'Add'}</button>
+          <button type="button" class="btn-remove">${this.options.removeButtonText || 'Remove'}</button>
+          <button type="button" class="btn-remove-all">${this.options.removeAllButtonText || 'Remove All'}</button>
+        `;
+    
+        container.appendChild(available.container);
+        container.appendChild(buttons);
+        container.appendChild(selected.container);
+        wrapper.appendChild(container);
+        this.selectElement.style.display = 'none';
+        this.selectElement.parentNode.insertBefore(wrapper, this.selectElement.nextSibling);
+    
+        // Populate options
+        const options = Array.from(this.selectElement.options);
+        options.forEach(opt => {
+          const option = new Option(opt.text, opt.value);
+          if (opt.selected) {
+            selected.select.appendChild(option);
+          } else {
+            available.select.appendChild(option);
+          }
+        });
+    
+        // Add event listeners
+        buttons.querySelector('.btn-add-all').onclick = () => {
+          this.moveAll(available.select, selected.select);
+        };
+        buttons.querySelector('.btn-add').onclick = () => {
+          this.moveSelected(available.select, selected.select);
+        };
+        buttons.querySelector('.btn-remove').onclick = () => {
+          this.moveSelected(selected.select, available.select);
+        };
+        buttons.querySelector('.btn-remove-all').onclick = () => {
+          this.moveAll(selected.select, available.select);
+        };
+    
+        // Sync selected options
+        const sync = () => {
+          Array.from(this.selectElement.options).forEach(opt => (opt.selected = false));
+          Array.from(selected.select.options).forEach(opt => {
+            const realOption = Array.from(this.selectElement.options).find(o => o.value === opt.value);
+            if (realOption) realOption.selected = true;
+          });
+        };
+    
+        available.select.addEventListener('change', sync);
+        selected.select.addEventListener('change', sync);
+        this.selectElement.form?.addEventListener('submit', sync);
+      }
+    
+      createList(title, type) {
+        const container = document.createElement('div');
+        container.classList.add(`dual-listbox__${type}`);
+    
+        const label = document.createElement('div');
+        label.classList.add('dual-listbox__title');
+        label.textContent = this.options[`${type}Title`] || `${type} options`;
+    
+        const search = document.createElement('input');
+        search.type = 'text';
+        search.classList.add('dual-listbox__search');
+        search.placeholder = 'Search';
+    
+        const select = document.createElement('select');
+        select.multiple = true;
+        select.size = 10;
+    
+        // Search filter
+        search.addEventListener('input', () => {
+          const searchTerm = search.value.toLowerCase();
+          Array.from(select.options).forEach(option => {
+            option.style.display = option.text.toLowerCase().includes(searchTerm) ? '' : 'none';
+          });
+        });
+    
+        container.appendChild(label);
+        container.appendChild(search);
+        container.appendChild(select);
+    
+        return { container, select };
+      }
+    
+      moveSelected(from, to) {
+        Array.from(from.selectedOptions).forEach(opt => {
+          to.appendChild(opt);
+        });
+      }
+    
+      moveAll(from, to) {
+        Array.from(from.options).forEach(opt => {
+          to.appendChild(opt);
+        });
+      }
+    }
+    </script>
+    
+
+<!-- 👇 Initialization Script -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const select = document.querySelector('#kt_dual_listbox_students');
+    new DualListbox(select, {
+      availableTitle: 'Available Students',
+      selectedTitle: 'Assigned Students',
+      addButtonText: 'Add',
+      removeButtonText: 'Remove',
+      addAllButtonText: 'Add All',
+      removeAllButtonText: 'Remove All',
+    });
+
+    // Optional: Initialize Select2
+    // $('#major_id, #teacher_id').select2({
+    //   width: '100%',
+    //   placeholder: 'Select...',
+    //   allowClear: true
+    // });
+  });
+
+  $(function () {
+    $('#major_id, #teacher_id').select2({
+        width: '100%',
+        placeholder: 'Select...',
+        allowClear: true
+    });
+
+    $('#major_id, #teacher_id').select2({
+        dropdownParent: $('.card-body') // or the modal if it's in one
+    });
+});
+</script>  
+  
+
+{% endblock %}

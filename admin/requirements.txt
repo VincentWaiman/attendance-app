@@ -1,0 +1,9 @@
+Flask
+Flask-Login
+Flask-SQLAlchemy
+Flask-Cors
+Werkzeug
+pymysql
+watchdog
+cryptography
+Flask-Migrate

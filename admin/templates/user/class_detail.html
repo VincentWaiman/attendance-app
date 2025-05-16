@@ -1,0 +1,209 @@
+{% extends 'user/base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <a href="{{ url_for('user.classes') }}" class="btn btn-outline-light mb-4 rounded-pill">
+        &larr; Back to Classes
+    </a>
+    
+    <div class="row g-4 align-items-stretch">
+        <!-- Class Detail Section (Left Side) -->
+        <div class="col-md-6 d-flex">
+            <div class="card w-100 h-100 shadow-lg rounded-4 border-0">
+                <div class="card-body">
+                    <h4 class="card-title text-primary mb-3">{{ class_.class_name }}</h4>
+                    <p><strong>Code:</strong> {{ class_.class_code }}</p>
+                    <p><strong>Major:</strong> {{ class_.major.name }}</p>
+                    <p><strong>Day:</strong> {{ class_.day }}</p>
+                    <p><strong>Time:</strong> {{ class_.class_time_start.strftime('%H:%M') }} - {{ class_.class_time_end.strftime('%H:%M') }}</p>
+                    <p><strong>Location:</strong> {{ class_.location }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Stream Section (Right Side) -->
+        <div class="col-md-6 d-flex">
+            <div class="card w-100 h-100 shadow-lg rounded-4 border-0 overflow-hidden">
+                <div class="ratio ratio-16x9 h-100">
+                    {% if is_class_active %}
+                        <img src="{{ url_for('video_feed') }}?ip={{ camera_ip }}&class_code={{ class_code }}" class="w-100 h-100 object-fit-cover" alt="Live Stream">
+                    {% else %}
+                        <div class="text-white text-center p-4">
+                            <h5>Kelas belum aktif saat ini.</h5>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Face Snips Section -->
+    <div class="card bg-dark text-white mt-5 shadow-lg rounded-4 border-0">
+        <div class="card-header bg-secondary text-white rounded-top-4">
+            <h5 class="mb-0">Face Snips</h5>
+        </div>
+        <div class="card-body">
+            <div id="snips-container" class="d-flex flex-wrap gap-3 justify-content-start">
+                {% for snip in face_snips %}
+                    <div class="snip-item d-flex flex-column align-items-center">
+                        <div class="snip-image">
+                            <img src="{{ url_for('static', filename=snip.path) | replace(' ', '%20') }}"
+                                class="img-fluid rounded bg-black"
+                                alt="Face Snip">
+                        </div>
+                        <div class="text-center mt-2">
+                            <div><strong>{{ snip.nim }}</strong></div>
+                            <div>{{ snip.nama.replace('_', ' ') }}</div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p class="text-white">Belum ada face snips.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ratio-16x9 {
+        aspect-ratio: 16 / 9;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .object-fit-cover {
+        object-fit: cover;
+    }
+
+    .snip-item {
+        width: 100px;
+    }
+
+    .snip-image {
+        width: 80px;
+        height: 80px;
+        overflow: hidden;
+        border: 2px solid #6c757d;
+        border-radius: 50%;
+        background-color: black;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s ease;
+    }
+
+    .snip-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .snip-image:hover {
+        transform: scale(1.1);
+        border-color: #0d6efd;
+    }
+
+    .card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+    }
+</style>
+
+<script>
+// (JS-mu tetap sama, hanya perbaiki loadSnips dikit)
+let snipsInterval = null;
+let videoStarted = {{ 'true' if is_class_active else 'false' }};
+
+function loadSnips() {
+    fetch('{{ url_for("user.load_snips", class_id=class_.id) }}')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('snips-container');
+            container.innerHTML = '';
+
+            if (data.snips.length > 0) {
+                data.snips.forEach(snip => {
+                    const snipItem = document.createElement('div');
+                    snipItem.className = 'snip-item d-flex flex-column align-items-center';
+
+                    const imgDiv = document.createElement('div');
+                    imgDiv.className = 'snip-image';
+
+                    const img = document.createElement('img');
+                    img.src = '/static/' + snip.path.replace(/ /g, '%20');
+                    img.alt = 'Face Snip';
+                    img.className = 'img-fluid rounded bg-black';
+                    img.style.objectFit = 'contain';
+
+                    imgDiv.appendChild(img);
+
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'text-center mt-2 text-white';
+                    infoDiv.innerHTML = `
+                        <div><strong>${snip.nim}</strong></div>
+                        <div>${snip.nama.replace(/_/g, ' ')}</div>
+                    `;
+
+                    snipItem.appendChild(imgDiv);
+                    snipItem.appendChild(infoDiv);
+                    container.appendChild(snipItem);
+                });
+            } else {
+                container.innerHTML = '<p class="text-white">Belum ada face snips atau kelas belum aktif.</p>';
+            }
+        })
+        .catch(error => console.error('Error loading snips:', error));
+}
+
+function checkClassActive() {
+    fetch('{{ url_for("user.is_class_active", class_id=class_.id) }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_active && !videoStarted) {
+                const ratioDiv = document.querySelector('.ratio');
+                ratioDiv.innerHTML = `
+                    <img src="{{ url_for('video_feed') }}?ip={{ camera_ip }}&class_code={{ class_code }}" class="w-100 h-100 object-fit-cover" alt="Live Stream">
+                `;
+
+                loadSnips();
+                snipsInterval = setInterval(loadSnips, 1000);
+                videoStarted = true;
+            } else if (!data.is_active && videoStarted) {
+                const ratioDiv = document.querySelector('.ratio');
+                ratioDiv.innerHTML = `
+                    <div class="text-white text-center p-4">
+                        <h5>Kelas belum aktif saat ini.</h5>
+                    </div>
+                `;
+
+                if (snipsInterval) {
+                    clearInterval(snipsInterval);
+                    snipsInterval = null;
+                }
+
+                const snipsContainer = document.getElementById('snips-container');
+                snipsContainer.innerHTML = '<p class="text-white">Kelas sudah selesai. Tidak ada face snips lagi.</p>';
+
+                videoStarted = false;
+            }
+        })
+        .catch(error => console.error('Error checking class active:', error));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (videoStarted) {
+        loadSnips();
+        snipsInterval = setInterval(loadSnips, 1000);
+    } else {
+        setInterval(checkClassActive, 1000);
+    }
+});
+</script>
+
+{% endblock %}

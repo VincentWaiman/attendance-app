@@ -1,0 +1,78 @@
+{% extends 'admin/base.html' %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+<div class="p-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h4 class="mb-0">Class List</h4>
+      <a href="{{ url_for('admin.add_class') }}" class="btn btn-primary">Add Class</a>
+    </div>
+
+    <div class="card-body">
+      <table id="classTable" class="table table-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Class Name</th>
+            <th>Location</th>
+            <th>Day</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Minimum Time</th>
+            <th># Students</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cls in classes %}
+          <tr>
+            <td>{{ cls.code }}</td>
+            <td>{{ cls.name }}</td>
+            <td>{{ cls.location or '-' }}</td>
+            <td>{{ cls.day }}</td>
+            <td>{{ cls.start_time }}</td>
+            <td>{{ cls.end_time }}</td>
+            <td>{{ cls.minimum_time }}</td>
+            <td>{{ cls.students }}</td>
+            <td>
+              <a href="{{ url_for('admin.edit_class', class_id=cls.id) }}" class="btn btn-sm btn-warning">
+                Edit
+              </a>
+              <a href="{{ url_for('admin.delete_class', class_id=cls.id) }}" 
+                 class="btn btn-sm btn-danger"
+                 onclick="return confirm('Are you sure you want to delete this class?');">
+                Delete
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+  $(document).ready(function () {
+    $('#classTable').DataTable();
+  });
+</script>
+
+{% endblock %}
