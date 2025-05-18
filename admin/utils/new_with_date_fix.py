@@ -1,4 +1,5 @@
 import json
+import sys
 import threading
 import cv2
 from flask import request
@@ -107,10 +108,7 @@ def process_video_streams(video_sources, frame_skip=3, conf=0.7, nms_thresh=0.7,
     if isinstance(video_sources, str) and video_sources.isdigit():
         video_sources = int(video_sources)
         
-    cap = cv2.VideoCapture(video_sources)
-
-    print(f"[DEBUG] Trying to open video source {video_sources}", flush=True)
-    cap = cv2.VideoCapture(video_sources)
+    cap = cv2.VideoCapture(video_sources, cv2.CAP_DSHOW)
     print(f"[DEBUG] cap.isOpened(): {cap.isOpened()}", flush=True)
     if not cap.isOpened():
         print(f"[ERROR] Failed to open video source: {video_sources} in thread {threading.current_thread().name}")
@@ -138,7 +136,7 @@ def process_video_streams(video_sources, frame_skip=3, conf=0.7, nms_thresh=0.7,
     track_last_recognition = {}
     recognition_futures = {}
     unknown_labels = {}
-    executor = ThreadPoolExecutor(max_workers=2)
+    executor = ThreadPoolExecutor(max_workers=4)
     last_annotations = []
 
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -162,135 +160,141 @@ def process_video_streams(video_sources, frame_skip=3, conf=0.7, nms_thresh=0.7,
     max_fail = 10
     
     while True:
-        if stop_event and stop_event.is_set():
-            print("[INFO] Stop event detected.")
-            break
-
-        if class_end_time and datetime.now() >= class_end_time:
-            print("[INFO] Class has ended.")
-            break
-
-        ret, frame = cap.read()
-        if not ret:
-            fail_count += 1
-            print(f"[WARNING] Failed to read frame ({fail_count}/{max_fail})")
-            if fail_count >= max_fail:
-                print("[ERROR] Maximum failed reads reached, exiting loop.")
+        try:
+            if stop_event and stop_event.is_set():
+                print("[INFO] Stop event detected.")
                 break
-            time.sleep(0.5)
-            continue
-        fail_count = 0 
 
-        frame_count += 1
-        current_time = time.time()
-        currently_present_ids = set()
+            if class_end_time and datetime.now() >= class_end_time:
+                print("[INFO] Class has ended.")
+                break
+            
+            for _ in range(5):  
+                cap.grab()
 
-        if frame_count % frame_skip == 0:
-            results = yolo_model(frame, device=device)
-            detections = []
-            for result in results:
-                boxes = torch.tensor(result.boxes.xyxy.cpu().numpy())
-                confidences = torch.tensor(result.boxes.conf.cpu().numpy())
-                class_ids = torch.tensor(result.boxes.cls.cpu().numpy().astype(int))
-                nms_indices = nms(boxes, confidences, nms_thresh)
-                for i in nms_indices:
-                    if class_ids[i].item() != class_id or confidences[i].item() < conf:
-                        continue
-                    x1, y1, x2, y2 = map(int, boxes[i].numpy())
-                    detections.append([[x1, y1, x2 - x1, y2 - y1], confidences[i].item(), class_id])
+            ret, frame = cap.read()
+            if not ret:
+                fail_count += 1
+                print(f"[WARNING] Failed to read frame ({fail_count}/{max_fail})")
+                if fail_count >= max_fail:
+                    print("[ERROR] Maximum failed reads reached, exiting loop.")
+                    break
+                time.sleep(0.5)
+                continue
+            fail_count = 0 
 
-            tracks = tracker.update_tracks(detections, frame=frame)
-            annotations = []
+            frame_count += 1
+            current_time = time.time()
+            currently_present_ids = set()
 
-            for track in tracks:
-                if track.is_confirmed():
+            if frame_count % frame_skip == 0:
+                results = yolo_model(frame, device=device)
+                detections = []
+                for result in results:
+                    boxes = torch.tensor(result.boxes.xyxy.cpu().numpy())
+                    confidences = torch.tensor(result.boxes.conf.cpu().numpy())
+                    class_ids = torch.tensor(result.boxes.cls.cpu().numpy().astype(int))
+                    nms_indices = nms(boxes, confidences, nms_thresh)
+                    for i in nms_indices:
+                        if class_ids[i].item() != class_id or confidences[i].item() < conf:
+                            continue
+                        x1, y1, x2, y2 = map(int, boxes[i].numpy())
+                        detections.append([[x1, y1, x2 - x1, y2 - y1], confidences[i].item(), class_id])
+
+                tracks = tracker.update_tracks(detections, frame=frame)
+                annotations = []
+
+                for track in tracks:
+                    if track.is_confirmed():
+                    
+                        currently_present_ids.add(track.track_id) 
+                        x1, y1, x2, y2 = map(int, track.to_ltrb())
+                        x1, y1 = max(0, x1), max(0, y1)
+                        x2, y2 = min(frame.shape[1], x2), min(frame.shape[0], y2)
+                        if x2 <= x1 or y2 <= y1:
+                            continue
+
+                        face_roi = frame[y1:y2, x1:x2].copy()
+
+                        if track.track_id not in track_info:
+                            now = datetime.now()
+                            timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+                            track_info[track.track_id] = {
+                                'label': 'Unknown',
+                                'conf': 0,
+                                'snapshot_saved': False,
+                                'appearance_start': now,
+                                'present': True,
+                                'first_seen': timestamp,
+                                'last_seen': timestamp
+                            }
+                        elif not track_info[track.track_id].get('present', False):
+                                track_info[track.track_id]['appearance_start'] = datetime.now()
+                                track_info[track.track_id]['present'] = True
+                                
+                        track_info[track.track_id]['last_seen'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                        
+                        last_time = track_last_recognition.get(track.track_id, 0)
+                        
+                        if current_time - track_last_recognition.get(track.track_id, 0) >= face_recognition_interval:
+                            track_last_recognition[track.track_id] = current_time
+                            future = executor.submit(recognize_and_capture, face_recognizer, face_roi)
+                            recognition_futures[track.track_id] = future
+
+                        if track.track_id in recognition_futures and recognition_futures[track.track_id].done():
+                            (new_nim, new_conf), captured_roi = recognition_futures[track.track_id].result()
+                            if new_nim is None:
+                                if track.track_id not in unknown_labels:
+                                    unknown_labels[track.track_id] = f"Unknown{len(unknown_labels)}"
+                                new_label = unknown_labels[track.track_id]
+                            else:
+                                student_name = nim_to_name.get(new_nim, "UnknownName").replace(" ", "_")  # Nama student
+                                new_label = f"{new_nim}_{student_name}"
+                                if track.track_id in unknown_labels:
+                                    unknown_path = os.path.join(snip_base_path, f"{unknown_labels[track.track_id]}.jpg")
+                                    if os.path.exists(unknown_path):
+                                        os.remove(unknown_path)
+                                    del unknown_labels[track.track_id]
+
+                            if new_conf > track_info[track.track_id]['conf'] or not track_info[track.track_id]['snapshot_saved']:
+                                # Update label and confidence regardless
+                                track_info[track.track_id]['label'] = new_label
+                                track_info[track.track_id]['conf'] = new_conf
+
+                                # Save the face snapshot, even if unknown
+                                snip_path = os.path.join(snip_base_path, f"{new_label}.jpg")
+                                cv2.imwrite(snip_path, captured_roi)
+
+                                track_info[track.track_id]['snapshot_saved'] = True
+
+                        annotations.append((x1, y1, x2, y2, track_info[track.track_id]['label']))
+
+                last_annotations = annotations
+
+            for (x1, y1, x2, y2, name) in last_annotations:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, name, (x1, y1 - 10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            ret2, jpeg = cv2.imencode('.jpg', frame)
+            print("ret2:", ret2, "video_sources:", video_sources)
+            if ret2 and str(video_sources):
+                with latest_frames_lock:
+                    latest_frames[video_sources] = jpeg.tobytes()
+                print(f"[DEBUG] Saved frame for {video_sources}", flush=True) 
                 
-                    currently_present_ids.add(track.track_id) 
-                    x1, y1, x2, y2 = map(int, track.to_ltrb())
-                    x1, y1 = max(0, x1), max(0, y1)
-                    x2, y2 = min(frame.shape[1], x2), min(frame.shape[0], y2)
-                    if x2 <= x1 or y2 <= y1:
-                        continue
+            if stop_event and stop_event.is_set():
+                print("[INFO] Stop event triggered.")
+                break
 
-                    face_roi = frame[y1:y2, x1:x2].copy()
-
-                    if track.track_id not in track_info:
-                        now = datetime.now()
-                        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-                        track_info[track.track_id] = {
-                            'label': 'Unknown',
-                            'conf': 0,
-                            'snapshot_saved': False,
-                            'appearance_start': now,
-                            'present': True,
-                            'first_seen': timestamp,
-                            'last_seen': timestamp
-                        }
-                    elif not track_info[track.track_id].get('present', False):
-                            track_info[track.track_id]['appearance_start'] = datetime.now()
-                            track_info[track.track_id]['present'] = True
-                            
-                    track_info[track.track_id]['last_seen'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                    
-                    last_time = track_last_recognition.get(track.track_id, 0)
-                    
-                    if current_time - track_last_recognition.get(track.track_id, 0) >= face_recognition_interval:
-                        track_last_recognition[track.track_id] = current_time
-                        future = executor.submit(recognize_and_capture, face_recognizer, face_roi)
-                        recognition_futures[track.track_id] = future
-
-                    if track.track_id in recognition_futures and recognition_futures[track.track_id].done():
-                        (new_nim, new_conf), captured_roi = recognition_futures[track.track_id].result()
-                        if new_nim is None:
-                            if track.track_id not in unknown_labels:
-                                unknown_labels[track.track_id] = f"Unknown{len(unknown_labels)}"
-                            new_label = unknown_labels[track.track_id]
-                        else:
-                            student_name = nim_to_name.get(new_nim, "UnknownName").replace(" ", "_")  # Nama student
-                            new_label = f"{new_nim}_{student_name}"
-                            if track.track_id in unknown_labels:
-                                unknown_path = os.path.join(snip_base_path, f"{unknown_labels[track.track_id]}.jpg")
-                                if os.path.exists(unknown_path):
-                                    os.remove(unknown_path)
-                                del unknown_labels[track.track_id]
-
-                        if new_conf > track_info[track.track_id]['conf'] or not track_info[track.track_id]['snapshot_saved']:
-                            # Update label and confidence regardless
-                            track_info[track.track_id]['label'] = new_label
-                            track_info[track.track_id]['conf'] = new_conf
-
-                            # Save the face snapshot, even if unknown
-                            snip_path = os.path.join(snip_base_path, f"{new_label}.jpg")
-                            cv2.imwrite(snip_path, captured_roi)
-
-                            track_info[track.track_id]['snapshot_saved'] = True
-
-                    annotations.append((x1, y1, x2, y2, track_info[track.track_id]['label']))
-
-            last_annotations = annotations
-
-        for (x1, y1, x2, y2, name) in last_annotations:
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, name, (x1, y1 - 10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-        
-        ret2, jpeg = cv2.imencode('.jpg', frame)
-        if ret2 and video_sources:
-            with latest_frames_lock:
-                latest_frames[video_sources] = jpeg.tobytes()
-            print(f"[DEBUG] Latest frame keys: {list(latest_frames.keys())}")
-            
-        if stop_event and stop_event.is_set():
-            print("[INFO] Stop event triggered.")
-            break
-
-        if class_end_time and datetime.now() >= class_end_time:
-            print("[INFO] Class end time reached.")
+            if class_end_time and datetime.now() >= class_end_time:
+                print("[INFO] Class end time reached.")
+                break
+        except Exception as e:
+            print(f"[CRASH] Thread crashed: {repr(e)}", file=sys.stderr, flush=True)
             break
             
-
     cap.release()
     
     cv2.destroyAllWindows()
@@ -374,12 +378,13 @@ def generate_stream(camera_ip):
     print(f"[generate_stream] Streaming from {camera_ip}")
     while True:
         with latest_frames_lock:
+            # print(f"LATEST FRAME {latest_frames}")
             frame = latest_frames.get(camera_ip)
 
-        if frame is not None:
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-        else:
-            print(f"[generate_stream] No frame yet for {camera_ip}")
-        time.sleep(0.05)
+            if frame is not None:
+                yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            else:
+                print(f"[generate_stream] No frame yet for {camera_ip}")
+            time.sleep(0.05)
 
