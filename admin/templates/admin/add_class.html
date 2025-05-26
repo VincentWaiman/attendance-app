@@ -136,87 +136,94 @@
           </div>
           <div class="card-body">
             <form action="{{ url_for('admin.save_class') }}" method="POST">
-              <div class="mb-3">
-                <label for="class_code" class="form-label">Class Code</label>
-                <input type="text" class="form-control" name="class_code" id="class_code" required>
-                <small id="class_code_error" class="text-danger"></small> 
-              </div>
-      
-              <div class="mb-3">
-                <label for="class_name" class="form-label">Class Name</label>
-                <input type="text" class="form-control" name="class_name" id="class_name" required>
-                <small id="class_name_error" class="text-danger"></small> 
-              </div>
-      
-              <div class="mb-3">
-                <label for="location" class="form-label">Location</label>
-                <input type="text" class="form-control" name="location">
-              </div>
-      
-              <div class="mb-3">
-                <label for="major_id" class="form-label">Major</label>
-                <select class="form-select" id="major_id" name="major_id" required>
-                  {% for major in majors %}
-                    <option value="{{ major.id }}">{{ major.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-      
-              <div class="mb-3">
-                <label for="teacher_id" class="form-label">Assign Teacher</label>
-                <select class="form-select" id="teacher_id" name="teacher_id" required>
-                  {% for user in teachers %}
-                    <option value="{{ user.id }}">{{ user.name }} ({{ user.email }})</option>
-                  {% endfor %}
-                </select>
-              </div>
-      
-              <div class="mb-3">
-                <label for="day" class="form-label">Day</label>
-                <select class="form-select" name="day" required>
-                  <option value="">Select a day</option>
-                  <option>Monday</option>
-                  <option>Tuesday</option>
-                  <option>Wednesday</option>
-                  <option>Thursday</option>
-                  <option>Friday</option>
-                  <option>Saturday</option>
-                  <option>Sunday</option>
-                </select>
-              </div>
-      
               <div class="row">
-                <div class="mb-3 col-md-6">
-                  <label for="class_time_start" class="form-label">Start Time</label>
-                  <input type="time" class="form-control" name="class_time_start" required>
+                <!-- Left column -->
+                <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="class_code" class="form-label">Class Code</label>
+                    <input type="text" class="form-control" name="class_code" id="class_code" required>
+                    <small id="class_code_error" class="text-danger"></small>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="class_name" class="form-label">Class Name</label>
+                    <input type="text" class="form-control" name="class_name" id="class_name" required>
+                    <small id="class_name_error" class="text-danger"></small>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" class="form-control" name="location">
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="major_id" class="form-label">Major</label>
+                    <select class="form-select" id="major_id" name="major_id" required>
+                      {% for major in majors %}
+                        <option value="{{ major.id }}">{{ major.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="teacher_id" class="form-label">Assign Teacher</label>
+                    <select class="form-select" id="teacher_id" name="teacher_id" required>
+                      {% for user in teachers %}
+                        <option value="{{ user.id }}">{{ user.name }} ({{ user.email }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
                 </div>
-                <div class="mb-3 col-md-6">
-                  <label for="class_time_end" class="form-label">End Time</label>
-                  <input type="time" class="form-control" name="class_time_end" required>
+
+                <!-- Right column -->
+                <!-- <div class="col-md-6">
+                  <div class="mb-3">
+                    <label for="day" class="form-label">Day</label>
+                    <select class="form-select" name="day" required>
+                      <option value="">Select a day</option>
+                      <option>Monday</option>
+                      <option>Tuesday</option>
+                      <option>Wednesday</option>
+                      <option>Thursday</option>
+                      <option>Friday</option>
+                      <option>Saturday</option>
+                      <option>Sunday</option>
+                    </select>
+                  </div> -->
+<!-- 
+                  <div class="row">
+                    <div class="mb-3 col-md-6">
+                      <label for="class_time_start" class="form-label">Start Time</label>
+                      <input type="time" class="form-control" name="class_time_start" required>
+                    </div>
+                    <div class="mb-3 col-md-6">
+                      <label for="class_time_end" class="form-label">End Time</label>
+                      <input type="time" class="form-control" name="class_time_end" required>
+                    </div>
+                  </div> -->
+
+                  <div class="mb-3">
+                    <label for="minimum_attendance_minutes" class="form-label">Minimum Attendance (in Minutes)</label>
+                    <input type="number" class="form-control" name="minimum_attendance_minutes" id="minimum_attendance_minutes" min="0" value="0" required>
+                  </div>
+
+                  <div class="mb-3">
+                    <label for="kt_dual_listbox_students" class="form-label">Assign Students</label>
+                    <select id="kt_dual_listbox_students" name="student_ids" multiple style="display: none;">
+                      {% for student in students %}
+                        <option value="{{ student.nim }}">{{ student.name }} ({{ student.email }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
                 </div>
               </div>
-
-              <div class="mb-3">
-                <label for="minimum_attendance_minutes" class="form-label">Minimum Attendance (in Minutes)</label>
-                <input type="number" class="form-control" name="minimum_attendance_minutes" id="minimum_attendance_minutes" min="0" value="0" required>
-              </div>
-      
-              <!-- Hidden Select Element for DualListbox -->
-            <div class="mb-3">
-                <label for="kt_dual_listbox_students" class="form-label">Assign Students</label>
-                <select id="kt_dual_listbox_students" name="student_ids" multiple style="display: none;">
-                {% for student in students %}
-                    <option value="{{ student.nim }}">{{ student.name }} ({{ student.email }})</option>
-                {% endfor %}
-                </select>
-            </div>
-
 
               <div class="text-end">
                 <button type="submit" class="btn btn-success">Create Class</button>
               </div>
             </form>
           </div>
+
         </div>
       </div>
 

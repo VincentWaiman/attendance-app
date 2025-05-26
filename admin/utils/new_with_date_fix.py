@@ -120,7 +120,7 @@ def process_video_streams(video_sources, frame_skip=3, conf=0.7, nms_thresh=0.7,
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     yolo_model = YOLO(r'D:\Calvin\Semester 8\TA\attandance-app\admin\utils\yolo11m_16_s.pt', verbose=False)
-    tracker = DeepSort(max_age=30, n_init=3, max_iou_distance=0.7)
+    tracker = DeepSort(max_age=30, n_init=3, max_iou_distance=0.6)
     face_recognizer = FaceRecognizer(db.session, threshold=face_threshold, students=students)
     nim_to_name = {student['nim']: student['name'] for student in students}
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -282,7 +282,7 @@ def process_video_streams(video_sources, frame_skip=3, conf=0.7, nms_thresh=0.7,
             if ret2 and str(video_sources):
                 with latest_frames_lock:
                     latest_frames[video_sources] = jpeg.tobytes()
-                print(f"[DEBUG] Saved frame for {video_sources}", flush=True) 
+                # print(f"[DEBUG] Saved frame for {video_sources}", flush=True) 
                 
             if stop_event and stop_event.is_set():
                 print("[INFO] Stop event triggered.")

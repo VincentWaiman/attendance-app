@@ -1,0 +1,37 @@
+{
+    "Unknown0": {
+        "label": "Unknown0",
+        "frames": 72,
+        "time": 3.0
+    },
+    "242400005": {
+        "label": "242400005_Mahasiswa_E",
+        "frames": 2411,
+        "time": 100.5
+    },
+    "242400002": {
+        "label": "242400002_Mahasiswa_B",
+        "frames": 2023,
+        "time": 84.3
+    },
+    "242400003": {
+        "label": "242400003_Mahasiswa_C",
+        "frames": 1885,
+        "time": 78.5
+    },
+    "242400004": {
+        "label": "242400004_Mahasiswa_D",
+        "frames": 1694,
+        "time": 70.6
+    },
+    "Unknown3": {
+        "label": "Unknown3",
+        "frames": 63,
+        "time": 2.6
+    },
+    "242400001": {
+        "label": "242400001_Mahasiswa_A",
+        "frames": 337,
+        "time": 14.0
+    }
+}

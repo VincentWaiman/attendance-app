@@ -24,7 +24,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost:3306/attandance_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'your_secret_key' 
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -158,9 +158,6 @@ def run_face_recognition():
                         is_validate=False
                     )
                     db.session.add(new_schedule)
-                    db.session.commit()  
-
-                    summary_lines = []
                     
                     # Convert minimum attendance to seconds for comparison
                     minimum_seconds = db.session.query(Class.minimum_attendance_minutes).filter_by(id=class_id).scalar() * 60
@@ -340,6 +337,11 @@ def seconds_to_duration(seconds):
         return f"{hours}h {minutes}m"
     else:
         return f"{minutes}m"
+    
+@app.errorhandler(413)
+def too_large(e):
+    # ?oversized=1 tells the template to show the alert
+    return redirect(url_for('user.upload_video', oversized=1))
 
 # ========== DEV ONLY ==========
 if __name__ == '__main__':

@@ -84,17 +84,25 @@
             <ul class="nav flex-column">
 
                 
-                <li class="nav-item">
+                <!-- <li class="nav-item">
                     <a href="{{ url_for('user.class_user') }}" class="{% if request.endpoint == 'user.class_user' %}active{% endif %}">
-                        <i class="bi bi-mortarboard"></i> Camera Class
+                        <i class="bi bi-mortarboard"></i> Classes
                     </a>
-                </li>
+                </li> -->
 
                 <li class="nav-item">
                     <a href="{{ url_for('user.classes') }}" class="{% if request.endpoint == 'user.classes' %}active{% endif %}">
                         <i class="bi bi-mortarboard"></i> Report
                     </a>
                 </li>
+
+                <li class="nav-item">
+                    <a href="{{ url_for('user.upload_video') }}" class="{% if request.endpoint == 'user.upload_video' %}active{% endif %}">
+                        <i class="bi bi-upload"></i> Upload Video
+                    </a>
+                </li>
+
+                
                 
             </ul>
         </div>

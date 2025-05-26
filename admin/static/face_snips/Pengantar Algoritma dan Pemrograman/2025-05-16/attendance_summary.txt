@@ -1,66 +1,32 @@
 {
-    "Unknown0": {
-        "label": "Unknown0",
-        "time": 41.4
+    "242400005": {
+        "label": "242400005_Mahasiswa_E",
+        "frames": 887,
+        "time": 37.0
     },
-    "Unknown1": {
-        "label": "Unknown1",
-        "time": 41.4
+    "242400002": {
+        "label": "242400002_Mahasiswa_B",
+        "frames": 667,
+        "time": 27.8
+    },
+    "242400003": {
+        "label": "242400003_Mahasiswa_C",
+        "frames": 656,
+        "time": 27.3
+    },
+    "242400004": {
+        "label": "242400004_Mahasiswa_D",
+        "frames": 561,
+        "time": 23.4
+    },
+    "242400001": {
+        "label": "242400001_Mahasiswa_A",
+        "frames": 113,
+        "time": 4.7
     },
     "Unknown3": {
         "label": "Unknown3",
-        "time": 41.4
-    },
-    "Unknown2": {
-        "label": "Unknown2",
-        "time": 41.4
-    },
-    "Unknown4": {
-        "label": "Unknown4",
-        "time": 41.4
-    },
-    "Unknown5": {
-        "label": "Unknown5",
-        "time": 41.4
-    },
-    "Unknown6": {
-        "label": "Unknown6",
-        "time": 41.4
-    },
-    "Unknown7": {
-        "label": "Unknown7",
-        "time": 41.4
-    },
-    "Unknown8": {
-        "label": "Unknown8",
-        "time": 41.4
-    },
-    "Unknown9": {
-        "label": "Unknown9",
-        "time": 41.4
-    },
-    "Unknown10": {
-        "label": "Unknown10",
-        "time": 41.4
-    },
-    "Unknown11": {
-        "label": "Unknown11",
-        "time": 41.4
-    },
-    "Unknown12": {
-        "label": "Unknown12",
-        "time": 41.4
-    },
-    "Unknown13": {
-        "label": "Unknown13",
-        "time": 41.4
-    },
-    "Unknown14": {
-        "label": "Unknown14",
-        "time": 41.4
-    },
-    "Unknown15": {
-        "label": "Unknown15",
-        "time": 40.2
+        "frames": 27,
+        "time": 1.1
     }
 }

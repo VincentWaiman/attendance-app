@@ -1,14 +1,23 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from multiprocessing import Process
 import os
+from pathlib import Path
 import shutil
+import threading
 import cv2
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required, current_user
 import numpy as np
 # from app import get_active_camera_ips
 from models import AssignedClass, Attendance, Camera, Class, Schedule, Student, StudentClass, db
 from flask import current_app
 from insightface.app import FaceAnalysis
+from werkzeug.utils import secure_filename
+
+from utils.process_uploaded_video import generate_stream, process_uploaded_video
+
+
 
 user_bp = Blueprint('user', __name__, template_folder='../templates')
 # from app import db
@@ -135,6 +144,45 @@ def load_snips(class_id):
 
     return jsonify({'snips': snips_data})
 
+
+@user_bp.route('/load_video_snips/<int:class_id>/<string:date>')
+@login_required
+def load_video_snips(class_id, date):
+    class_ = Class.query.get_or_404(class_id)
+    class_name = class_.class_name
+
+    snip_folder = os.path.join(current_app.root_path, 'static', 'face_snips', class_name, date)
+    os.makedirs(snip_folder, exist_ok=True)
+    snips_data = []  
+
+    # print(f'[DEBUG] Looking for snips at: {snip_folder}')
+
+    for filename in os.listdir(snip_folder):
+        if filename.lower().endswith(('.jpg', '.png', '.jpeg')):
+            filename_no_ext = os.path.splitext(filename)[0]
+
+            if filename_no_ext.lower().startswith('unknown'):
+                nim = "Unknown"
+                nama = "Unknown"
+            else:
+                parts = filename_no_ext.split('_')
+                if len(parts) >= 2:
+                    nim = parts[0]
+                    nama = '_'.join(parts[1:])
+                else:
+                    nim = filename_no_ext
+                    nama = ""
+
+            snips_data.append({
+                'path': f'face_snips/{class_name}/{date}/{filename}',
+                'nim': nim,
+                'nama': nama
+            })
+    else:
+        print('[DEBUG] Snip folder not found.')
+
+    return jsonify({'snips': snips_data})
+
 @user_bp.route('/class/<int:class_id>')
 @login_required
 def class_detail(class_id):
@@ -197,9 +245,12 @@ def class_attendance(class_id):
 def validate_attendance(schedule_id):
     schedule = Schedule.query.get_or_404(schedule_id)
     class_ = schedule.class_
+    # print(schedule.tanggal)
+    # print(class_)
+    # today = datetime.now()
+    today_date = schedule.tanggal
 
-    today = datetime.now()
-    today_date = today.strftime('%Y-%m-%d')
+    # today_date = schedule.
     class_name = class_.class_name
 
     snip_folder = os.path.join(current_app.root_path, 'static', 'face_snips', class_name, today_date)
@@ -391,43 +442,6 @@ def validate_action():
 
 
 
-# @user_bp.route('/assign_unknown', methods=['POST'])
-# @login_required
-# def assign_unknown():
-#     snip_path = request.form.get('snip_path')
-#     student_id = request.form.get('student_id')
-#     attendance_id = request.form.get('attendance_id')
-
-#     if not snip_path or not student_id or not attendance_id:
-#         flash('Data tidak lengkap.', 'danger')
-#         return redirect(request.referrer)
-
-#     student = Student.query.get(student_id)
-#     attendance = Attendance.query.get(attendance_id)
-
-#     if not student or not attendance:
-#         flash('Data tidak valid.', 'danger')
-#         return redirect(request.referrer)
-
-#     attendance.student_id = student.id
-#     db.session.commit()
-
-#     # Rename file
-#     old_full_path = os.path.join(current_app.static_folder, snip_path)
-#     new_filename = f"{student.nim}_{student.name.replace(' ', '_')}.jpg"
-#     new_snip_path = os.path.join('face_snips', *snip_path.split('/')[1:3], new_filename)
-#     new_full_path = os.path.join(current_app.static_folder, new_snip_path)
-
-#     try:
-#         os.rename(old_full_path, new_full_path)
-#     except Exception as e:
-#         flash(f'Gagal rename file: {e}', 'danger')
-#         return redirect(request.referrer)
-
-#     flash('Snip berhasil di-assign ke mahasiswa.', 'success')
-#     return redirect(request.referrer)
-
-
 @user_bp.route('/assign_unknown', methods=['POST'])
 @login_required
 def assign_unknown():
@@ -490,3 +504,125 @@ def durationformat(value):
         parts.append(f"{seconds} detik")
     
     return ' '.join(parts)
+
+
+def run_with_app_context(app, video_sources, class_name, students, date):
+    with app.app_context():
+        return process_uploaded_video(
+            video_sources,
+            class_name=class_name,
+            students=students,
+            date=date
+        )
+
+@user_bp.route('/upload_video', methods=['GET', 'POST'])
+@login_required
+def upload_video():
+    UPLOAD_DIR = Path(current_app.root_path) / 'static' / 'uploads' / 'videos'
+
+    classes = (
+        Class.query.join(AssignedClass)
+        .filter(AssignedClass.user_id == current_user.id)
+        .all()
+    )
+
+    if request.method == 'POST':
+        try:
+            class_id = request.form.get('class_id')
+            video_file = request.files.get('video')
+            video_date = request.form.get('video_date')
+
+            if not class_id or not video_file or video_file.filename == '':
+                flash('Pilih kelas dan file video dulu.', 'warning')
+                return redirect(request.url)
+
+            # Save video file
+            filename = secure_filename(video_file.filename)
+            save_dir = UPLOAD_DIR / str(class_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
+            video_path = save_dir / filename
+            video_file.save(video_path)
+
+            # Retrieve class and student data
+            selected_class = Class.query.get(class_id)
+            if not selected_class:
+                flash('Kelas tidak ditemukan.', 'danger')
+                return redirect(request.url)
+
+            students = [
+                {'nim': sc.student.nim, 'name': sc.student.name}
+                for sc in selected_class.student_classes
+            ]   
+            
+            result = process_uploaded_video(
+                video_sources=video_path,
+                class_name=selected_class.class_name,
+                students=students,
+                date=video_date
+            )
+
+            date_str = result.get('date_str')
+            person_data = result.get('person_data', {})
+            class_name = result.get('class_name')
+
+            new_schedule = Schedule(
+                class_id=class_id,
+                tanggal=date_str,
+                is_validate=False
+            )
+            db.session.add(new_schedule)
+
+            minimum_seconds = db.session.query(Class.minimum_attendance_minutes).filter_by(id=class_id).scalar() * 60
+
+            for person_id, info in person_data.items():
+                label = info['label']
+                time_tracked = info['time']
+
+                if '_' in label:
+                    nim, name = label.split('_', 1)
+                else:
+                    nim, name = label, 'Unknown'
+
+                attendance_status = 'Present' if info['time'] >= minimum_seconds else 'Absent'
+
+                if not person_id.startswith('Unknown'):
+                    student = Student.query.filter_by(nim=nim).first()
+                    if student:
+                        attendance = Attendance(
+                            student_id=student.id,
+                            schedule_id=new_schedule.id,
+                            timestamp=info['time'],
+                            status=attendance_status
+                        )
+                        db.session.add(attendance)
+                else:
+                    attendance = Attendance(
+                        student_id=None,
+                        schedule_id=new_schedule.id,
+                        timestamp=info['time'],
+                        status=attendance_status,
+                        label=label
+                    )
+                    db.session.add(attendance)
+
+            db.session.commit()
+            schedule_id = new_schedule.id
+                    
+            return redirect(url_for('user.validate_attendance', schedule_id=new_schedule.id))
+
+        except Exception as e:
+            current_app.logger.error(f"Error during video upload: {e}", exc_info=True)
+            return redirect(request.url)
+
+    return render_template('user/upload_video.html', classes=classes)
+
+@user_bp.route("/video_feed")
+def video_feed():
+    video_sources = request.args.get("video_sources")
+    
+    if not video_sources:
+        return "No video source provided", 400
+
+    return Response(generate_stream(video_sources),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
+    
